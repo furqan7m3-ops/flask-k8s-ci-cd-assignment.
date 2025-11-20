@@ -1,13 +1,11 @@
-from flask import Flask
+from fastapi import FastAPI
 
+app = FastAPI()
 
-app = Flask(__name__)
+@app.get("/")
+def root():
+    return {"message": "App is running successfully!"}
 
-
-@app.route('/')
-def hello():
-  return "Hello, World!"
-
-
-if __name__ == "__main__":
-  app.run(host='0.0.0.0', port=5000)
+@app.get("/add")
+def add(a: int, b: int):
+    return {"result": a + b}
