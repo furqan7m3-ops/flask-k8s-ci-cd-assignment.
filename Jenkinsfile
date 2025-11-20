@@ -2,61 +2,56 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_IMAGE = "hasnishoro/flask-app"
-        KUBECONFIG_CREDENTIALS = "kubeconfig-credentials-id"   // replace with your Jenkins credential ID
+        DOCKER_IMAGE = "flask-app:latest"
+        KUBE_MANIFEST_PATH = "kubernetes/"
     }
 
     stages {
 
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
-        }
-
         stage('Build Docker Image') {
             steps {
                 script {
-                    IMAGE_TAG = "${DOCKER_IMAGE}:${BUILD_NUMBER}"
-                    sh "docker build -t ${IMAGE_TAG} ."
-                }
-            }
-        }
-
-        stage('Login to Docker Hub') {
-            steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'docker-hub-creds',      // replace with your Jenkins credentials ID
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
-                )]) {
-                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
-                }
-            }
-        }
-
-        stage('Push Docker Image') {
-            steps {
-                script {
-                    sh "docker push ${IMAGE_TAG}"
+                    echo "Building Docker Image..."
+                    sh """
+                        eval \$(minikube -p minikube docker-env)
+                        docker build -t ${DOCKER_IMAGE} .
+                    """
                 }
             }
         }
 
         stage('Deploy to Kubernetes') {
             steps {
-                withCredentials([file(credentialsId: KUBECONFIG_CREDENTIALS, variable: 'KUBECONFIG')]) {
-                    sh 'kubectl apply -f kubernetes/deployment.yaml'
-                    sh 'kubectl apply -f kubernetes/service.yaml'
+                script {
+                    echo "Applying Kubernetes Manifests..."
+                    sh """
+                        kubectl apply -f ${KUBE_MANIFEST_PATH}
+                    """
+                }
+            }
+        }
+
+        stage('Verify Deployment') {
+            steps {
+                script {
+                    echo "Checking rollout status..."
+                    sh """
+                        kubectl rollout status deployment/flask-app-deployment --timeout=60s
+                        kubectl get pods
+                        kubectl get services
+                        kubectl get deployments
+                    """
                 }
             }
         }
     }
 
     post {
-        always {
-            sh 'docker logout'
-            cleanWs()
+        success {
+            echo "Deployment completed successfully!"
+        }
+        failure {
+            echo "Deployment failed. Check logs for details."
         }
     }
 }
