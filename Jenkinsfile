@@ -3,7 +3,6 @@ pipeline {
 
     environment {
         DOCKER_IMAGE = "flask-app:latest"
-        KUBE_MANIFEST_PATH = "kubernetes/"
     }
 
     stages {
@@ -13,7 +12,6 @@ pipeline {
                 script {
                     echo "Building Docker Image..."
                     sh """
-                        eval \$(minikube -p minikube docker-env)
                         docker build -t ${DOCKER_IMAGE} .
                     """
                 }
@@ -25,7 +23,8 @@ pipeline {
                 script {
                     echo "Applying Kubernetes Manifests..."
                     sh """
-                        kubectl apply -f ${KUBE_MANIFEST_PATH}
+                        kubectl apply -f deployment.yaml
+                        kubectl apply -f service.yaml
                     """
                 }
             }
